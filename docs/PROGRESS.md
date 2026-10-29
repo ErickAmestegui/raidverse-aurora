@@ -35,3 +35,21 @@ Before future large changes, inspect Git and propose a restore point. Initial sc
 - Browser assets in output/playwright are REHEARSAL material, not submission evidence.
 - Git initialized locally. Elevated tool user differs from sandbox owner; use per-command safe.directory only if necessary, never a global trust change.
 - Twitch .env absent as of this checkpoint. Real OAuth, authentic chat, subscriptions against Twitch, two real channels, raid/OBS recording and live end-to-end remain blocked on user setup.
+
+## Final local validation checkpoint — 2026-10-29
+- Local restoration commit: c267655 (initial functional MVP); subsequent QA/docs fixes are recorded in Git.
+- Expanded `npm test`: **39/39 passed** (20 domain, 8 HTTP, 11 Twitch fixtures). Added simultaneous channel fixture connections, raid notification routing and subscription-401 reauthorization. Refreshed expiring tokens before opening EventSub to respect the welcome subscription deadline.
+- Final `npm run build`: **passed**, including TypeScript. Advisory: the authored Three.js + React entry bundle is ~749 kB / ~204 kB gzip; not a build failure. No claim of optimized low-end-device performance.
+- `npm audit --omit=dev`: zero known vulnerabilities at the last executed check. tsx classified as a runtime dependency because npm start uses it. Audit results are time-bound, not a security guarantee.
+- Browser: transparent overlay at 1920×1080 and 1280×720; synthetic watermark; actual dashboard clear/restore; no horizontal overflow at 1280×720 or 390×844; legacy page and mobile navigation checked.
+- Browser rAF sample: 151 callbacks over 2.5 seconds, about 60 callbacks/s. This is not OBS or a GPU benchmark.
+- Switched the real local process from development to **production on http://localhost:3000**. Data retained the same artifact 5e31b038-2e10-4bf7-8e0b-63cb845c4e57, owner NOVA, two communities, counts light=1/fire=1/storm=1/crystal=2.
+- Production browser QA: **passed**; zero page exceptions, CSP present, emergency clear/restore worked, public legacy retained data. Actual canvas pixel sample: 1,396,427 fully transparent and 145,333 visible pixels; establishes alpha output for that frame, not OBS compositing certification.
+- Improved functional text readability, sticky emergency control, mobile navigation, legacy pagination, selected-channel restoration and clear feedback after overlay-key rotation.
+- English README, architecture, testing guide, criterion-by-criterion audits, Devpost draft, 2:45 video shot list and third-party notes prepared.
+- Source-only package and rehearsal screenshots can be shared; exclude data, vault key, .env, browser logs/storage, node_modules and caches.
+
+## Next action / hard external gate
+The user must register a confidential Twitch application with callback http://localhost:3000/auth/callback and save credentials locally in raidverse/.env, never in chat or Git. Confirm two consenting real channels. Restart the server, authorize them in separate browser profiles, then execute docs/TESTING.md's LIVE checklist. Until that passes, **RAIDVERSE is not complete and not ready to submit**.
+
+No remote deployment, repository publication, YouTube upload or Devpost submission has been performed. Those need a concrete review and the user's publication approval. No paid AI API, promotional credits or new paid service was used.

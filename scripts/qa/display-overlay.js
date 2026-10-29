@@ -1,0 +1,42 @@
+async (page) => {
+  await page.getByRole('button', { name: 'NOVA', exact: false }).click();
+  await page.getByRole('button', { name: 'Stream setup', exact: false }).click();
+  await page.getByRole('button', { name: 'Generate overlay URL' }).click();
+  const link = await page.getByRole('textbox', { name: 'Private OBS browser source URL' }).inputValue();
+  const overlay = await page.context().newPage();
+  await overlay.goto(link); await overlay.setViewportSize({ width: 1920, height: 1080 });
+  await overlay.getByRole('heading', { name: 'Aether 001' }).waitFor();
+  const transparent = await overlay.evaluate(() => ({ html: getComputedStyle(document.documentElement).backgroundColor, body: getComputedStyle(document.body).backgroundColor }));
+  if (transparent.html !== 'rgba(0, 0, 0, 0)' || transparent.body !== 'rgba(0, 0, 0, 0)') throw new Error('Overlay background must be transparent');
+  if (!(await overlay.getByText('REHEARSAL · SYNTHETIC EVENTS').isVisible())) throw new Error('Synthetic overlay watermark required');
+  await overlay.screenshot({ path: 'output/playwright/overlay-rehearsal-1080.png', omitBackground: true });
+  await overlay.setViewportSize({ width: 1280, height: 720 });
+  await overlay.screenshot({ path: 'output/playwright/overlay-rehearsal-720.png', omitBackground: true });
+  await page.getByRole('button', { name: 'The forge', exact: false }).click();
+  await page.getByRole('button', { name: 'Clear overlay', exact: false }).click();
+  await overlay.getByRole('heading', { name: 'Aether 001' }).waitFor({ state: 'hidden', timeout: 5000 });
+  await page.getByRole('button', { name: 'Restore', exact: true }).click();
+  await overlay.getByRole('heading', { name: 'Aether 001' }).waitFor();
+  const frames = await overlay.evaluate(async () => {
+    const times = []; const started = performance.now();
+    await new Promise(resolve => { const tick = now => { times.push(now); if (now - started < 2500) requestAnimationFrame(tick); else resolve(); }; requestAnimationFrame(tick); });
+    return { frames: times.length, duration: times.at(-1) - times[0], averageFps: (times.length - 1) * 1000 / (times.at(-1) - times[0]) };
+  });
+  console.log('Overlay requestAnimationFrame sampling (not an OBS benchmark)', frames);
+  await overlay.close();
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw new Error('720p horizontal overflow');
+  await page.screenshot({ path: 'output/playwright/dashboard-720.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw new Error('Mobile horizontal overflow');
+  await page.screenshot({ path: 'output/playwright/dashboard-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.screenshot({ path: 'output/playwright/dashboard-1080.png' });
+  const publicPath = await page.getByRole('link', { name: 'Open public legacy', exact: false }).getAttribute('href');
+  await page.goto('http://localhost:3000' + publicPath);
+  await page.getByRole('heading', { name: 'Aether 001' }).waitFor();
+  await page.screenshot({ path: 'output/playwright/legacy-rehearsal-1080.png', fullPage: true });
+  if ((await page.getByText('TWITCH', { exact: true }).count()) > 0) throw new Error('Rehearsal legacy must not show live proof');
+  return { checks: 'overlay transparency, synthetic watermark, clear/restore, no overflow at 720p/mobile, 1080p, public legacy', animationSample: frames };
+}

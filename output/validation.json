@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-29",
+  "status": "LOCAL_MVP_VERIFIED_LIVE_PENDING",
+  "automatedTests": { "passed": 39, "failed": 0, "domain": 20, "http": 8, "twitchLocalFixtures": 11 },
+  "typecheck": "PASS",
+  "productionBuild": "PASS_WITH_BUNDLE_SIZE_ADVISORY",
+  "runtimeDependencyAudit": "ZERO_KNOWN_VULNERABILITIES_AT_CHECK_TIME",
+  "browser": {
+    "engine": "Chromium",
+    "syntheticTransferAndReceiverEvolution": "PASS",
+    "productionSmoke": "PASS",
+    "pageExceptionsDuringProductionCheck": 0,
+    "canvasAlpha": { "fullyTransparentPixels": 1396427, "visiblePixels": 145333 },
+    "emergencyClearRestore": "PASS",
+    "mobileNavigation": "PASS",
+    "horizontalOverflow720AndMobile": false,
+    "productionCsp": "PRESENT",
+    "rafSample": { "callbacks": 151, "durationMs": 2500, "note": "Not a GPU, load, or OBS benchmark" }
+  },
+  "liveOAuth": "NOT_VERIFIED",
+  "authenticChat": "NOT_VERIFIED",
+  "authenticRaid": "NOT_VERIFIED",
+  "obsEndToEnd": "NOT_VERIFIED",
+  "remoteHosting": "NOT_PROVISIONED",
+  "youtube": "NOT_CREATED_OR_UPLOADED",
+  "devpost": "NOT_SUBMITTED",
+  "mainCodexSessionId": "01a18894-cb84-7530-8113-1b14124a414e"
+}

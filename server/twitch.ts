@@ -108,13 +108,25 @@ class EventConnection {
     this.open('wss://eventsub.wss.twitch.tv/ws');
     this.watchdog = setInterval(() => { if (this.socket && Date.now() - this.last > this.keepalive + 10_000) this.socket.terminate(); }, 5000);
   }
-  private open(url: string, migration = false) {
+  private async open(url: string, migration = false) {
+    if (this.stopped) return;
+    // Refresh before opening: Twitch gives only ten seconds after welcome to subscribe.
+    try { if (!migration) await this.twitch.access(this.user); }
+    catch (error) {
+      if (error instanceof TwitchError && [400, 401, 403].includes(error.status)) { this.twitch.invalidate(this.user); return; }
+      this.info.status = 'Token refresh unavailable — retrying';
+      if (!this.timer) this.timer = setTimeout(() => { this.timer = null; void this.open(url); }, 15_000);
+      this.twitch.notify(); return;
+    }
     if (this.stopped) return;
     const parsed = new URL(url);
     if (parsed.protocol !== 'wss:' || parsed.hostname !== 'eventsub.wss.twitch.tv') { this.info.status = 'Unsafe reconnect URL rejected'; return; }
     const ws = this.twitch.socketFactory(url); this.sockets.add(ws);
     if (!migration) { this.socket = ws; this.last = Date.now(); this.info.chat = false; this.info.raid = false; this.subscriptions.clear(); }
-    ws.on('message', bytes => { this.handle(ws, bytes.toString(), migration).catch(() => { this.info.status = 'EventSub setup failed — retrying'; ws.terminate(); this.twitch.notify(); }); });
+    ws.on('message', bytes => { this.handle(ws, bytes.toString(), migration).catch(error => {
+      if (error instanceof TwitchError && [401, 403].includes(error.status)) { this.twitch.invalidate(this.user); return; }
+      this.info.status = 'EventSub setup failed — retrying'; ws.terminate(); this.twitch.notify();
+    }); });
     ws.on('error', () => { this.info.status = 'EventSub connection error'; this.twitch.notify(); });
     ws.on('close', () => {
       this.sockets.delete(ws);

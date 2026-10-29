@@ -84,4 +84,27 @@ describe('Twitch adapter with local protocol fixtures — NOT live Twitch eviden
     await connect(); remote.terminate(); await waitFor(() => calls.filter(c => c.url.endsWith('/subscriptions')).length === 4);
     expect(twitch.infos()[id].raid).toBe(true);
   });
+  it('keeps two independently authenticated channel connections active', async () => {
+    domain.register('200', 'nova', 'Nova', 'LIVE');
+    store.putCredentials('200', { access: 'second-test-access', refresh: 'second-test-refresh', expiresAt: Date.now() + 3600_000 });
+    await connect(); twitch.connect('200'); await waitFor(() => Boolean(twitch.infos()['200']?.chat && twitch.infos()['200']?.raid));
+    expect(wss.clients.size).toBe(2); expect(twitch.infos()[id].chat).toBe(true);
+    const conditions = calls.filter(c => c.url.endsWith('/subscriptions')).map(c => c.body.condition);
+    expect(conditions).toContainEqual({ broadcaster_user_id: '200', user_id: '200' });
+  });
+  it('routes a matching raid notification to receiver approval', async () => {
+    domain.register('200', 'nova', 'Nova', 'LIVE'); domain.action('200', { type: 'settings', enabled: true, incoming: true, allowMods: false });
+    domain.action(id, { type: 'stop' }); domain.action(id, { type: 'prepare', target: '200' }); await connect();
+    send({ metadata: { message_id: 'raid-fixture', message_type: 'notification', message_timestamp: new Date().toISOString() }, payload: {
+      subscription: { id: 'channel.raid', type: 'channel.raid', condition: { from_broadcaster_user_id: id } },
+      event: { from_broadcaster_user_id: id, to_broadcaster_user_id: '200', viewers: 5 },
+    } });
+    await waitFor(() => store.read().transfers[0].status === 'PENDING_APPROVAL');
+    expect(store.read().transfers[0].raidEventId).toBe('raid-fixture'); expect(store.read().artifacts[0].ownerId).toBe(id);
+  });
+  it('requires reauthorization immediately when subscription access is denied', async () => {
+    const s = store.createSession(id); vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 401 })));
+    twitch.connect(id); await waitFor(() => store.credentials(id) === null);
+    expect(store.session(s.token)).toBeNull(); expect(twitch.infos()[id].chat).toBe(false);
+  });
 });
