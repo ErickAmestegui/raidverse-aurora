@@ -49,6 +49,26 @@ Before future large changes, inspect Git and propose a restore point. Initial sc
 - English README, architecture, testing guide, criterion-by-criterion audits, Devpost draft, 2:45 video shot list and third-party notes prepared.
 - Source-only package and rehearsal screenshots can be shared; exclude data, vault key, .env, browser logs/storage, node_modules and caches.
 
+## Aurora Edition visual transformation & hardening — 2026-10-29
+- Redesigned the visual experience according to the approved **RAIDVERSE — Aurora Edition** direction:
+  - Central design tokens: Electric Violet (`#8054FF`), Cosmic Pink (`#FF609E`), Aurora Teal (`#37DCD0`), Warm Gold (`#FFBC69`), Midnight Blue (`#141633`), Lavender White (`#F7F5FF`).
+  - Authored 3D Relic in Three.js: faceted jewel geometry, chromatic edge dispersion, glowing inner 8-point golden star core, tiered plinth with neon concentric rings for dashboard, floating multifaceted crystal shards and orbiting energy halos. Preserves 100% canvas transparency in OBS overlay (`plinth.visible = !transparent`).
+  - Streamlined navigation: Home, My Artifact, Transfers, Memories, Settings.
+  - Primary headline: "Create something together. Your community builds it. Your next raid carries it forward."
+  - 3-step primary flow: **CREATE → EVOLVE → SEND**.
+  - Community Powers cards: Light (golden 8-point star), Fire (stylized flame crest), Storm (celestial vortex), Crystal (faceted gem), with instant 1-click clipboard copy.
+  - Interactive Transfers: clear route display, waiting for raid, receiver acceptance, and procedural portal animation.
+  - Memories: emotional visual cards and timeline, linking to public `/legacy/:id` route.
+  - Clear state indicators: REHEARSAL MODE vs TWITCH LIVE vs DISCONNECTED vs NEEDS ATTENTION.
+  - Emergency hide: decoupled from dashboard operations, immediately hides overlay and persists across reloads.
+- Expanded automated test suite: **53/53 tests passed** (api.test.ts, domain.test.ts, twitch.test.ts).
+- TypeScript and production bundle: **passed** (`tsc --noEmit && vite build`).
+- Browser Playwright QA:
+  - `aurora.js`: verified rename, copy commands, 4 powers, transfer preparation, simulation, receiver approval, portal, and evolution.
+  - `aurora-safety.js`: verified emergency button while an operation is busy, keyboard skip link, and persistent mobile safety control after scroll.
+  - Verified no horizontal overflow across 1920, 1440, 1280, 820, and 390 px viewports.
+  - Verified OBS overlay canvas transparency (zero alpha pixels outside artwork).
+
 ## Next action / hard external gate
 The user must register a confidential Twitch application with callback http://localhost:3000/auth/callback and save credentials locally in raidverse/.env, never in chat or Git. Confirm two consenting real channels. Restart the server, authorize them in separate browser profiles, then execute docs/TESTING.md's LIVE checklist. Until that passes, **RAIDVERSE is not complete and not ready to submit**.
 

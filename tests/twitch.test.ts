@@ -34,6 +34,7 @@ beforeEach(async () => {
   store.putCredentials(id, { access: 'test-access', refresh: 'test-refresh', expiresAt: Date.now() + 3600_000 });
 });
 afterEach(async () => {
+  vi.useRealTimers();
   twitch.stop(); for (const ws of wss.clients) ws.terminate(); await new Promise<void>(resolve => wss.close(() => resolve()));
   store.close(); rmSync(dir, { recursive: true, force: true }); vi.unstubAllGlobals();
 });
@@ -55,6 +56,17 @@ describe('Twitch adapter with local protocol fixtures — NOT live Twitch eviden
     await connect(); send(message()); send(message()); await waitFor(() => store.read().artifacts[0].energy.crystal === 1);
     expect(store.read().artifacts[0].history.filter(h => h.kind === 'CONTRIBUTION')).toHaveLength(1);
   });
+  it('persists all four allowlisted powers from independently identified chatters', async () => {
+    await connect();
+    for (const element of ['light', 'fire', 'storm', 'crystal']) {
+      send(message({ chatter_user_id: `viewer-${element}`, message: { text: `!forge ${element}` } }, `power-${element}`));
+    }
+    await waitFor(() => Object.values(store.read().artifacts[0].energy).every(n => n === 1));
+    const contributions = store.read().artifacts[0].history.filter(h => h.kind === 'CONTRIBUTION');
+    expect(contributions).toHaveLength(4);
+    expect(contributions.every(h => h.evidence === 'TWITCH' && h.eventId?.startsWith('power-') && h.userId?.startsWith('viewer-'))).toBe(true);
+    // TWITCH here is the adapter's domain classification; this entire test is a local fixture.
+  });
   it('rejects unrelated subscription IDs, wrong broadcasters and shared chat', async () => {
     await connect(); send(message({}, 'wrong-sub', 'forged-subscription')); send(message({ broadcaster_user_id: 'other' }, 'wrong-channel')); send(message({ source_broadcaster_user_id: 'other' }, 'shared'));
     const before = notifications; send({ metadata: { message_id: 'tick', message_type: 'notification', message_timestamp: new Date().toISOString() }, payload: { subscription: { id: 'ignored', type: 'ignored', condition: {} } } });
@@ -65,9 +77,36 @@ describe('Twitch adapter with local protocol fixtures — NOT live Twitch eviden
     const result = await Promise.all([twitch.access(id), twitch.access(id)]); expect(result[0].access).toBe('new-access');
     expect(calls.filter(c => c.url.endsWith('/token'))).toHaveLength(1); expect(store.credentials(id)?.refresh).toBe('new-refresh');
   });
+  it('does not restore credentials if authorization is revoked during refresh', async () => {
+    store.putCredentials(id, { access: 'old', refresh: 'old-refresh', expiresAt: Date.now() - 1000 });
+    let release!: () => void;
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      await new Promise<void>(resolve => { release = resolve; });
+      return Response.json({ access_token: 'late-access', refresh_token: 'late-refresh', expires_in: 3600 });
+    }));
+    const pending = twitch.access(id); const assertion = expect(pending).rejects.toThrow();
+    twitch.invalidate(id); release(); await assertion;
+    expect(store.credentials(id)).toBeNull();
+  });
   it('ends authorization and sessions when validation is revoked', async () => {
     const session = store.createSession(id); vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 401 })));
     await expect(twitch.validate(id)).rejects.toThrow(); expect(store.session(session.token)).toBeNull(); expect(store.credentials(id)).toBeNull(); expect(store.read().channels[0].enabled).toBe(false);
+  });
+  it.each([
+    { client_id: 'another-client', user_id: id, scopes: ['user:read:chat'] },
+    { client_id: 'client', user_id: id, scopes: [] },
+    { client_id: 'client', user_id: 'another-user', scopes: ['user:read:chat'] },
+  ])('rejects token identity or minimum-scope mismatch: %j', async mismatch => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ login: 'orbital', expires_in: 3600, ...mismatch })));
+    const session = store.createSession(id);
+    await expect(twitch.validate(id)).rejects.toThrow();
+    expect(store.credentials(id)).toBeNull(); expect(store.session(session.token)).toBeNull();
+  });
+  it('ends authorization on an EventSub revocation message', async () => {
+    await connect(); const session = store.createSession(id);
+    send({ metadata: { message_id: 'revocation', message_type: 'revocation', message_timestamp: new Date().toISOString() }, payload: { subscription: { id: 'channel.chat.message', type: 'channel.chat.message', status: 'authorization_revoked' } } });
+    await waitFor(() => store.credentials(id) === null);
+    expect(store.session(session.token)).toBeNull(); expect(twitch.infos()[id]).toMatchObject({ chat: false, raid: false });
   });
   it('exchanges code server-side and verifies identity and minimum scope', async () => {
     const result = await twitch.exchange('authorization-code'); expect(result.id).toBe(id);
@@ -106,5 +145,45 @@ describe('Twitch adapter with local protocol fixtures — NOT live Twitch eviden
     const s = store.createSession(id); vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 401 })));
     twitch.connect(id); await waitFor(() => store.credentials(id) === null);
     expect(store.session(s.token)).toBeNull(); expect(twitch.infos()[id].chat).toBe(false);
+  });
+  it('never restores connected indicators after revocation during subscription setup', async () => {
+    const originalFetch = globalThis.fetch; let release!: () => void; let pending = false;
+    vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/eventsub/subscriptions') && !pending) {
+        pending = true; await new Promise<void>(resolve => { release = resolve; });
+      }
+      return originalFetch(url, options);
+    }));
+    twitch.connect(id); await waitFor(() => pending); twitch.invalidate(id); release();
+    await waitFor(() => calls.some(c => c.url.endsWith('/subscriptions')));
+    expect(twitch.infos()[id]).toMatchObject({ chat: false, raid: false });
+    expect(twitch.infos()[id].status).not.toBe('Connected');
+    expect(store.credentials(id)).toBeNull();
+  });
+  it('retries a temporary startup validation failure before connecting', async () => {
+    vi.useFakeTimers(); const originalFetch = globalThis.fetch; let validationRequests = 0;
+    vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/oauth2/validate') && ++validationRequests === 1) return new Response('', { status: 503 });
+      return originalFetch(url, options);
+    }));
+    const connect = vi.spyOn(twitch, 'connect').mockImplementation(() => {});
+    await twitch.start(); expect(connect).not.toHaveBeenCalled();
+    expect(twitch.infos()[id]).toMatchObject({ chat: false, raid: false });
+    expect(twitch.infos()[id].status).toContain('retry');
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(validationRequests).toBe(2); expect(connect).toHaveBeenCalledExactlyOnceWith(id);
+  });
+  it('does not retry startup authorization that Twitch has revoked', async () => {
+    vi.useFakeTimers(); const fetch = vi.fn(async () => new Response('', { status: 401 })); vi.stubGlobal('fetch', fetch);
+    const connect = vi.spyOn(twitch, 'connect').mockImplementation(() => {});
+    await twitch.start(); await vi.advanceTimersByTimeAsync(30_000);
+    expect(store.credentials(id)).toBeNull(); expect(fetch).toHaveBeenCalledTimes(1); expect(connect).not.toHaveBeenCalled();
+    expect(twitch.infos()[id]).toMatchObject({ chat: false, raid: false });
+  });
+  it('cancels pending startup validation retries when stopped', async () => {
+    vi.useFakeTimers(); const fetch = vi.fn(async () => new Response('', { status: 503 })); vi.stubGlobal('fetch', fetch);
+    const connect = vi.spyOn(twitch, 'connect').mockImplementation(() => {});
+    await twitch.start(); twitch.stop(); await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetch).toHaveBeenCalledTimes(1); expect(connect).not.toHaveBeenCalled();
   });
 });

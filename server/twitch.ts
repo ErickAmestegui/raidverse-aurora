@@ -22,6 +22,9 @@ export class Twitch {
   readonly connections = new Map<string, EventConnection>();
   private refreshing = new Map<string, Promise<Credentials>>();
   private validationTimer: ReturnType<typeof setInterval> | null = null;
+  private startupRetries = new Map<string, ReturnType<typeof setTimeout>>();
+  private startupInfo = new Map<string, ConnectionInfo>();
+  private stopped = false;
   socketFactory = (url: string): WebSocket => new WebSocket(url, { handshakeTimeout: 15_000, maxPayload: 1024 * 1024 });
   constructor(public store: Store, public domain: Domain, public config: TwitchConfig, public notify: () => void) {}
   get configured() { return Boolean(this.config.clientId && this.config.clientSecret); }
@@ -49,13 +52,18 @@ export class Twitch {
     if (creds.expiresAt > Date.now() + 60_000) return creds;
     const existing = this.refreshing.get(user); if (existing) return existing;
     const work = (async () => {
+      const sameGrant = () => {
+        const current = this.store.credentials(user);
+        return current?.access === creds.access && current?.refresh === creds.refresh;
+      };
       try {
         const token = tokenSchema.parse(await twitchFetch('https://id.twitch.tv/oauth2/token', { method: 'POST', body: new URLSearchParams({
           client_id: this.config.clientId, client_secret: this.config.clientSecret, grant_type: 'refresh_token', refresh_token: creds.refresh,
         }) }));
+        if (this.stopped || !sameGrant()) throw new Error('Authorization changed during token refresh');
         const result = { access: token.access_token, refresh: token.refresh_token, expiresAt: Date.now() + token.expires_in * 1000 };
         this.store.putCredentials(user, result); return result;
-      } catch (e) { if (e instanceof TwitchError && [400, 401, 403].includes(e.status)) this.invalidate(user); throw e; }
+      } catch (e) { if (!this.stopped && e instanceof TwitchError && [400, 401, 403].includes(e.status) && sameGrant()) this.invalidate(user); throw e; }
       finally { this.refreshing.delete(user); }
     })(); this.refreshing.set(user, work); return work;
   }
@@ -66,30 +74,58 @@ export class Twitch {
     } catch (e) { if (e instanceof TwitchError && [401, 403].includes(e.status)) this.invalidate(user); throw e; }
   }
   invalidate(user: string) {
+    this.cancelStartupRetry(user);
     this.store.revoke(user); const connection = this.connections.get(user);
     connection?.stop(); if (connection) connection.info.status = 'Authorization expired — reconnect Twitch';
+    else this.startupInfo.set(user, { status: 'Authorization expired — reconnect Twitch', chat: false, raid: false });
     this.domain.store.transaction(s => { const c = s.channels.find(c => c.id === user); if (c) c.enabled = false; });
     this.notify();
   }
   connect(user: string) {
+    if (this.stopped) return;
+    this.cancelStartupRetry(user); this.startupInfo.delete(user);
     this.connections.get(user)?.stop();
     const connection = new EventConnection(user, this); this.connections.set(user, connection); connection.start();
   }
   async start() {
-    if (!this.configured) return;
+    if (!this.configured || this.stopped) return;
     for (const channel of this.store.read().channels.filter(c => c.mode === 'LIVE')) {
       if (!this.store.credentials(channel.id)) continue;
-      try { await this.validate(channel.id); this.connect(channel.id); }
-      catch { /* UI reports disconnected; never silently replace live with rehearsal. */ }
+      await this.restoreConnection(channel.id);
     }
+    if (this.stopped) return;
     this.validationTimer = setInterval(() => {
       for (const user of this.connections.keys()) if (this.store.credentials(user)) this.validate(user).catch(() => {
         const c = this.connections.get(user); if (c) c.info.status = 'Token validation failed — check connection'; this.notify();
       });
     }, 3600_000);
   }
-  infos() { return Object.fromEntries([...this.connections].map(([id, c]) => [id, c.info])); }
-  stop() { if (this.validationTimer) clearInterval(this.validationTimer); for (const c of this.connections.values()) c.stop(); }
+  private cancelStartupRetry(user: string) {
+    const timer = this.startupRetries.get(user); if (timer) clearTimeout(timer); this.startupRetries.delete(user);
+  }
+  private async restoreConnection(user: string, attempt = 0) {
+    if (this.stopped || !this.store.credentials(user)) return;
+    try {
+      await this.validate(user);
+      if (!this.stopped && this.store.credentials(user)) this.connect(user);
+    } catch {
+      // validate() invalidates revoked grants. Retry only temporary failures with a retained grant.
+      if (this.stopped || !this.store.credentials(user)) return;
+      const delay = Math.min(30_000, 1000 * 2 ** Math.min(attempt, 5));
+      this.startupInfo.set(user, { status: `Cannot validate Twitch — retrying in ${delay / 1000}s. Check your connection.`, chat: false, raid: false });
+      this.cancelStartupRetry(user);
+      this.startupRetries.set(user, setTimeout(() => {
+        this.startupRetries.delete(user); void this.restoreConnection(user, attempt + 1);
+      }, delay));
+      this.notify();
+    }
+  }
+  infos() { return Object.fromEntries([...this.startupInfo, ...[...this.connections].map(([id, c]) => [id, c.info] as const)]); }
+  stop() {
+    this.stopped = true; if (this.validationTimer) clearInterval(this.validationTimer);
+    for (const timer of this.startupRetries.values()) clearTimeout(timer); this.startupRetries.clear();
+    for (const c of this.connections.values()) c.stop();
+  }
 }
 
 class EventConnection {
@@ -124,10 +160,12 @@ class EventConnection {
     const ws = this.twitch.socketFactory(url); this.sockets.add(ws);
     if (!migration) { this.socket = ws; this.last = Date.now(); this.info.chat = false; this.info.raid = false; this.subscriptions.clear(); }
     ws.on('message', bytes => { this.handle(ws, bytes.toString(), migration).catch(error => {
+      // A response can settle after sign-out/revocation or a replacement connection.
+      if (this.stopped || this.twitch.connections.get(this.user) !== this) return;
       if (error instanceof TwitchError && [401, 403].includes(error.status)) { this.twitch.invalidate(this.user); return; }
       this.info.status = 'EventSub setup failed — retrying'; ws.terminate(); this.twitch.notify();
     }); });
-    ws.on('error', () => { this.info.status = 'EventSub connection error'; this.twitch.notify(); });
+    ws.on('error', () => { if (!this.stopped) { this.info.status = 'EventSub connection error'; this.twitch.notify(); } });
     ws.on('close', () => {
       this.sockets.delete(ws);
       if (this.stopped) return;
@@ -139,6 +177,7 @@ class EventConnection {
     });
   }
   private async handle(ws: WebSocket, raw: string, migration: boolean) {
+    if (this.stopped) return;
     const parsed = envelope.safeParse(JSON.parse(raw)); if (!parsed.success) return;
     const { metadata, payload } = parsed.data; this.last = Date.now();
     if (metadata.message_type === 'session_welcome') {
@@ -147,6 +186,7 @@ class EventConnection {
       if (previous && previous !== ws) previous.close();
       if (!migration) {
         const credentials = await this.twitch.access(this.user);
+        if (this.stopped || this.socket !== ws || ws.readyState !== WebSocket.OPEN) return;
         for (const [type, condition] of [
           ['channel.chat.message', { broadcaster_user_id: this.user, user_id: this.user }],
           ['channel.raid', { from_broadcaster_user_id: this.user }],
@@ -154,6 +194,7 @@ class EventConnection {
           const result = z.object({ data: z.array(z.object({ id: z.string(), status: z.string() })).min(1) }).parse(await twitchFetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
             method: 'POST', headers: this.twitch.headers(credentials.access), body: JSON.stringify({ type, version: '1', condition, transport: { method: 'websocket', session_id: session.id } }),
           }));
+          if (this.stopped || this.socket !== ws || ws.readyState !== WebSocket.OPEN) return;
           if (result.data[0].status !== 'enabled') throw new Error('Subscription not enabled');
           this.subscriptions.set(result.data[0].id, type);
           if (type === 'channel.raid') this.info.raid = true; else this.info.chat = true;

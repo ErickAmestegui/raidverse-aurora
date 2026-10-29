@@ -61,4 +61,25 @@ describe('HTTP integration and security boundaries', () => {
   it('rejects arbitrary actions and validates JSON fields', async () => {
     const s = await rehearsal(); expect((await post('/api/control/rehearsal-a', { type: 'exec', url: 'https://evil.example' }, s.cookie, s.csrf)).status).toBe(400);
   });
+  it('allows only the authenticated owning channel to rename its artifact', async () => {
+    for (const id of ['owner', 'other']) {
+      app.domain.register(id, id, id, 'LIVE');
+      app.domain.action(id, { type: 'settings', enabled: true, incoming: true, allowMods: false });
+    }
+    app.domain.action('owner', { type: 'create', name: 'Original' });
+    const artifactId = store.read().channels.find(c => c.id === 'owner')!.artifactId;
+    const owner = store.createSession('owner'); const other = store.createSession('other');
+    const rename = { type: 'rename', name: 'Aurora live' };
+    expect((await post('/api/control/owner', rename, `rv_session=${other.token}`, other.session.csrf)).status).toBe(400);
+    expect((await post('/api/control/owner', rename, `rv_session=${owner.token}`, 'forged')).status).toBe(400);
+    expect((await post('/api/control/owner', { type: 'rename', name: ' ' }, `rv_session=${owner.token}`, owner.session.csrf)).status).toBe(400);
+    expect(store.read().artifacts[0].name).toBe('Original');
+    expect((await post('/api/control/owner', rename, `rv_session=${owner.token}`, owner.session.csrf)).status).toBe(200);
+    const snapshot = await (await fetch(origin + '/api/snapshot')).json();
+    expect(snapshot.artifacts[0]).toMatchObject({ id: artifactId, name: 'Aurora live', ownerId: 'owner' });
+    expect(snapshot.artifacts[0].history.at(-1)).toMatchObject({ kind: 'RENAMED', evidence: 'CONTROL' });
+    const synthetic = await rehearsal();
+    expect((await post('/api/control/owner', { type: 'rename', name: 'Synthetic override' }, synthetic.cookie, synthetic.csrf)).status).toBe(400);
+    expect(store.read().artifacts[0].name).toBe('Aurora live');
+  });
 });

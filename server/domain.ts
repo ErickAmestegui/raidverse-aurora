@@ -3,8 +3,10 @@ import { z } from 'zod';
 import type { Artifact, Channel, Element, History, Mode, Phase } from '../src/shared.js';
 import { activeTransfer, current, secret, Store, type State } from './store.js';
 
+const artifactName = z.string().trim().min(1).max(48).refine(name => !/[\u0000-\u001f\u007f]/.test(name), 'Use a single-line artifact name');
 export const actionSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('create'), name: z.string().trim().min(1).max(48) }),
+  z.object({ type: z.literal('create'), name: artifactName }),
+  z.object({ type: z.literal('rename'), name: artifactName }),
   z.object({ type: z.enum(['start', 'stop', 'clear', 'reveal', 'archive', 'rotate-overlay']) }),
   z.object({ type: z.literal('settings'), enabled: z.boolean(), incoming: z.boolean(), allowMods: z.boolean() }),
   z.object({ type: z.literal('prepare'), target: z.string().min(1).max(80) }),
@@ -102,6 +104,17 @@ export class Domain {
         s.artifacts.push(a); c.artifactId = a.id; c.hidden = false; return;
       }
       const a = current(s, c);
+      if (input.type === 'rename') {
+        if (pending()) throw new Error('Cancel or complete the outgoing transfer before renaming');
+        // Validate here as well as at the HTTP boundary; preserve the invitation's identity
+        // and every contribution if this operation is called by another trusted adapter.
+        const name = artifactName.parse(input.name);
+        if (name !== a.name) {
+          const previous = a.name; a.name = name;
+          record(a, now, 'RENAMED', c.id, `Renamed from ${previous} to ${name}`);
+        }
+        return;
+      }
       if (input.type === 'archive') {
         if (pending()) throw new Error('Cancel the outgoing invitation first');
         c.artifactId = null; record(a, now, 'ARCHIVED', c.id, 'Preserved in the legacy archive'); a.phase = 'READY'; return;

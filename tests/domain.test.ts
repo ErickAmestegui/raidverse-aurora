@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Domain, appearance, parseForge } from '../server/domain';
+import { Domain, actionSchema, appearance, parseForge } from '../server/domain';
 import { Store } from '../server/store';
 import type { Mode } from '../src/shared';
 
@@ -98,6 +98,40 @@ describe('raid-gated transfer', () => {
   });
 });
 describe('storage and control protection', () => {
+  it('renames the current artifact without changing a live round, energy or earlier history, and persists it', () => {
+    create(); chat(); const before = artifact();
+    domain.action('a', { type: 'rename', name: '  Aurora prism  ' });
+    const renamed = artifact();
+    expect(renamed).toMatchObject({ id: before.id, seed: before.seed, name: 'Aurora prism', phase: before.phase, round: before.round, ownerId: before.ownerId, energy: before.energy, communities: before.communities });
+    expect(renamed.history.slice(0, -1)).toEqual(before.history);
+    expect(renamed.history.at(-1)).toMatchObject({ kind: 'RENAMED', evidence: 'CONTROL', channelId: 'a', label: 'Renamed from Aether to Aurora prism' });
+    expect(renamed.version).toBe(before.version + 1);
+    store.close(); store = new Store(dir); domain = new Domain(store, () => {}, () => now);
+    expect(artifact()).toEqual(renamed);
+  });
+  it('validates artifact names and does not duplicate a no-op rename', () => {
+    create(); const before = artifact();
+    domain.action('a', { type: 'rename', name: 'Aether' });
+    expect(artifact()).toEqual(before);
+    for (const name of ['', '  ', 'x'.repeat(49), 'Aurora\nprism', 'Aurora\u0000prism']) {
+      expect(actionSchema.safeParse({ type: 'rename', name }).success).toBe(false);
+      expect(() => domain.action('a', { type: 'rename', name })).toThrow();
+      expect(artifact()).toEqual(before);
+    }
+    expect(actionSchema.parse({ type: 'rename', name: '  Aether ✨  ' })).toEqual({ type: 'rename', name: 'Aether ✨' });
+  });
+  it('freezes the name during a transfer and moves rename control to the accepted receiver', () => {
+    const t = prepare(); const before = artifact();
+    expect(() => domain.action('a', { type: 'rename', name: 'Changed invitation' })).toThrow('transfer');
+    expect(artifact()).toEqual(before); raid();
+    expect(() => domain.action('a', { type: 'rename', name: 'Changed pending invitation' })).toThrow('transfer');
+    expect(() => domain.action('b', { type: 'rename', name: 'Not accepted yet' })).toThrow('No active artifact');
+    domain.action('b', { type: 'accept', transferId: t.id });
+    expect(() => domain.action('a', { type: 'rename', name: 'Previous owner' })).toThrow('No active artifact');
+    domain.action('b', { type: 'rename', name: 'NOVA Aurora' });
+    expect(artifact()).toMatchObject({ id: before.id, seed: before.seed, name: 'NOVA Aurora', ownerId: 'b' });
+    expect(artifact().history.at(-1)).toMatchObject({ kind: 'RENAMED', channelId: 'b' });
+  });
   it('encrypts credentials and revokes sessions', () => {
     const creds = { access: 'private-access-secret', refresh: 'private-refresh-secret', expiresAt: now }; store.putCredentials('a', creds);
     expect(store.credentials('a')).toEqual(creds); const encrypted = store.db.prepare('SELECT encrypted FROM credentials').get() as { encrypted: string };

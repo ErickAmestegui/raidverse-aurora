@@ -49,6 +49,15 @@ These are conservative internal 0–10 assessments, not the official judging sca
 
 A protocol fixture is valuable for robustness but does not close the live-integration gate. No final 40/40 claim is justified.
 
-## Phase 6 — Submission: OPEN
+## Phase 7 — Aurora Edition: COMPLETE VISUAL TRANSFORMATION & EXTENDED REGRESSIONS
 
-English drafts and shot list can be prepared now. A YouTube link, published repository, live footage, usage metrics, user testimonials and claims of production readiness must not be invented. Submission and publication require the operator's approval.
+| Criterion | Score | Evidence | Missing / risk | Highest-value next action |
+|---|---:|---|---|---|
+| Innovation | 7.5 | Integrated CREATE → EVOLVE → SEND mental model with persistent collaborative 3D artifact, community lineage, and explicit streamer handoff. Distinct from passive alerts. | Novelty still needs proof during authentic Twitch raids with real audiences. | Record a live two-channel raid handoff demonstrating identical persistent ID. |
+| Potential impact | 7 | Low barrier to entry: 1 viewer can forge; 4 intuitive elements; clean streamer onboarding; distinct emergency controls; public legacy showcase. | Live retention across multiple long streams remains unmeasured. | Test live broadcast with 2 consenting streamers. |
+| Technology | 8 | 53/53 automated tests passing (vitest); strict TypeScript (`tsc --noEmit`); clean production build; SQLite persistence; OAuth token refresh and EventSub reconnection handling; robust safety controls decoupling emergency clear from pending async operations. | Live Twitch OAuth/EventSub and OBS Browser Source compositing remain unverified until user provides credentials. | Set up `raidverse/.env` and execute two-channel authentication test. |
+| Design | 8.5 | High-fidelity implementation of Aurora design system: electric violet / cosmic pink / aurora teal palette, multifaceted 3D crystal with chromatic dispersion and internal golden star core, tiered plinth, SVG community power cards, glassmorphism, responsive across 5 viewports (1920 to 390px), keyboard accessible. | Real OBS hardware rendering performance and multi-streamer visual feedback. | Test overlay directly within OBS Studio browser source. |
+
+## Phase 8 — Submission: OPEN
+
+English drafts, shot list, and architecture are prepared. A YouTube link, published repository, live footage, usage metrics, user testimonials and claims of production readiness must not be invented. Submission and publication require the operator's approval.
