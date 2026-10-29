@@ -1,0 +1,87 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import WebSocket, { WebSocketServer } from 'ws';
+import type { AddressInfo } from 'node:net';
+import { Store } from '../server/store';
+import { Domain } from '../server/domain';
+import { Twitch } from '../server/twitch';
+
+let store: Store, domain: Domain, twitch: Twitch, dir: string, wss: WebSocketServer;
+let remote: WebSocket; let calls: { url: string; body: Record<string, unknown> }[]; let notifications: number;
+const id = '100';
+const welcome = (session = 'session-1') => ({ metadata: { message_id: 'welcome', message_type: 'session_welcome', message_timestamp: new Date().toISOString() }, payload: { session: { id: session, keepalive_timeout_seconds: 30 } } });
+const send = (value: unknown) => remote.send(JSON.stringify(value));
+async function waitFor(fn: () => boolean) { await vi.waitFor(() => expect(fn()).toBe(true), { timeout: 5000, interval: 25 }); }
+beforeEach(async () => {
+  dir = mkdtempSync(join(tmpdir(), 'raidverse-twitch-')); store = new Store(dir); domain = new Domain(store); calls = []; notifications = 0;
+  twitch = new Twitch(store, domain, { clientId: 'client', clientSecret: 'secret-test-only', origin: 'http://localhost:3000' }, () => notifications++);
+  wss = new WebSocketServer({ port: 0, host: '127.0.0.1' }); await new Promise<void>(resolve => wss.once('listening', resolve));
+  twitch.socketFactory = () => new WebSocket(`ws://127.0.0.1:${(wss.address() as AddressInfo).port}`);
+  wss.on('connection', ws => { remote = ws; ws.send(JSON.stringify(welcome())); });
+  vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
+    const body = options?.body instanceof URLSearchParams ? Object.fromEntries(options.body) : options?.body ? JSON.parse(String(options.body)) : {};
+    calls.push({ url, body });
+    if (url.endsWith('/oauth2/validate')) return Response.json({ client_id: 'client', user_id: id, login: 'orbital', scopes: ['user:read:chat'], expires_in: 3600 });
+    if (url.endsWith('/oauth2/token')) return Response.json({ access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600 });
+    if (url.endsWith('/helix/users')) return Response.json({ data: [{ id, login: 'orbital', display_name: 'Orbital' }] });
+    if (url.endsWith('/eventsub/subscriptions')) return Response.json({ data: [{ id: body.type, status: 'enabled' }] }, { status: 202 });
+    throw new Error('Unexpected test request');
+  }));
+  domain.register(id, 'orbital', 'Orbital', 'LIVE'); domain.action(id, { type: 'settings', enabled: true, incoming: true, allowMods: false });
+  domain.action(id, { type: 'create', name: 'Live protocol test' }); domain.action(id, { type: 'start' });
+  store.putCredentials(id, { access: 'test-access', refresh: 'test-refresh', expiresAt: Date.now() + 3600_000 });
+});
+afterEach(async () => {
+  twitch.stop(); for (const ws of wss.clients) ws.terminate(); await new Promise<void>(resolve => wss.close(() => resolve()));
+  store.close(); rmSync(dir, { recursive: true, force: true }); vi.unstubAllGlobals();
+});
+async function connect() { twitch.connect(id); await waitFor(() => twitch.infos()[id]?.chat && twitch.infos()[id]?.raid); }
+function message(extra: Record<string, unknown> = {}, eventId = 'chat-1', subId = 'channel.chat.message') {
+  return { metadata: { message_id: `envelope-${eventId}`, message_type: 'notification', message_timestamp: new Date().toISOString() }, payload: {
+    subscription: { id: subId, type: 'channel.chat.message', condition: { broadcaster_user_id: id, user_id: id } },
+    event: { broadcaster_user_id: id, chatter_user_id: 'viewer', chatter_user_name: 'Real protocol fixture', message_id: eventId, message: { text: '!forge crystal' }, badges: [], ...extra },
+  } };
+}
+describe('Twitch adapter with local protocol fixtures — NOT live Twitch evidence', () => {
+  it('subscribes to self chat and outgoing raids using user transport', async () => {
+    await connect(); const subs = calls.filter(c => c.url.endsWith('/subscriptions')); expect(subs).toHaveLength(2);
+    expect(subs[0].body).toMatchObject({ type: 'channel.chat.message', condition: { user_id: id, broadcaster_user_id: id }, transport: { method: 'websocket', session_id: 'session-1' } });
+    expect(subs[1].body).toMatchObject({ type: 'channel.raid', condition: { from_broadcaster_user_id: id } });
+    expect(subs[1].body.condition).not.toHaveProperty('to_broadcaster_user_id');
+  });
+  it('consumes a validated chat envelope once, without trusting browser input', async () => {
+    await connect(); send(message()); send(message()); await waitFor(() => store.read().artifacts[0].energy.crystal === 1);
+    expect(store.read().artifacts[0].history.filter(h => h.kind === 'CONTRIBUTION')).toHaveLength(1);
+  });
+  it('rejects unrelated subscription IDs, wrong broadcasters and shared chat', async () => {
+    await connect(); send(message({}, 'wrong-sub', 'forged-subscription')); send(message({ broadcaster_user_id: 'other' }, 'wrong-channel')); send(message({ source_broadcaster_user_id: 'other' }, 'shared'));
+    const before = notifications; send({ metadata: { message_id: 'tick', message_type: 'notification', message_timestamp: new Date().toISOString() }, payload: { subscription: { id: 'ignored', type: 'ignored', condition: {} } } });
+    await new Promise(resolve => setTimeout(resolve, 100)); expect(store.read().artifacts[0].energy.crystal).toBe(0);
+  });
+  it('refreshes an expiring token once for concurrent requests', async () => {
+    store.putCredentials(id, { access: 'old', refresh: 'old-refresh', expiresAt: Date.now() - 1000 });
+    const result = await Promise.all([twitch.access(id), twitch.access(id)]); expect(result[0].access).toBe('new-access');
+    expect(calls.filter(c => c.url.endsWith('/token'))).toHaveLength(1); expect(store.credentials(id)?.refresh).toBe('new-refresh');
+  });
+  it('ends authorization and sessions when validation is revoked', async () => {
+    const session = store.createSession(id); vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 401 })));
+    await expect(twitch.validate(id)).rejects.toThrow(); expect(store.session(session.token)).toBeNull(); expect(store.credentials(id)).toBeNull(); expect(store.read().channels[0].enabled).toBe(false);
+  });
+  it('exchanges code server-side and verifies identity and minimum scope', async () => {
+    const result = await twitch.exchange('authorization-code'); expect(result.id).toBe(id);
+    const token = calls.find(c => c.url.endsWith('/token'))!; expect(token.body).toMatchObject({ grant_type: 'authorization_code', redirect_uri: 'http://localhost:3000/auth/callback' });
+    expect(store.credentials(id)?.access).toBe('new-access'); await waitFor(() => Boolean(twitch.infos()[id].raid));
+  });
+  it('migrates reconnect sessions without creating duplicate subscriptions', async () => {
+    await connect(); const before = calls.filter(c => c.url.endsWith('/subscriptions')).length;
+    send({ metadata: { message_id: 'reconnect', message_type: 'session_reconnect', message_timestamp: new Date().toISOString() }, payload: { session: { reconnect_url: 'wss://eventsub.wss.twitch.tv/ws?reconnect=test-fixture' } } });
+    await waitFor(() => twitch.infos()[id].status === 'Connected' && wss.clients.size === 1);
+    expect(calls.filter(c => c.url.endsWith('/subscriptions'))).toHaveLength(before);
+  });
+  it('reconnects and resubscribes after transport loss', async () => {
+    await connect(); remote.terminate(); await waitFor(() => calls.filter(c => c.url.endsWith('/subscriptions')).length === 4);
+    expect(twitch.infos()[id].raid).toBe(true);
+  });
+});
