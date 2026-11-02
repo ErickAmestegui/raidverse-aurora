@@ -1,65 +1,89 @@
-# Submission preparation — NOT SUBMITTED
+﻿# Submission package — NOT SUBMITTED
 
-## Official requirements checkpoint (2026-10-29)
+Updated November 1, 2026, Bolivia time. No repository publication, YouTube upload or Devpost submission is recorded. This is a local installation, not a hosted service.
 
-[Official rules](https://twitchcon-codex.devpost.com/rules) and [resources/FAQ](https://twitchcon-codex.devpost.com/resources) were checked.
+## Official requirements rechecked
 
-- Deadline: November 2, 2026, 14:00 PST = 18:00 Bolivia. Internal target: November 1.
-- Build a newly created interactive Twitch project using Codex; provide an accessible repository, English description, Codex session ID, and a YouTube demonstration under three minutes showing Twitch functionality and Codex development.
-- Provide working installation/testing instructions and access for judging. Confirm entrant eligibility and rights to any third-party material before submitting.
-- Four equally weighted criteria: innovation, potential impact, technology and design. Internal scores are not official scores.
-- Repository publication, YouTube upload and Devpost submission remain undone. Actual Twitch/OBS footage is missing.
+The [official rules, sections 1, 3–6](https://twitchcon-codex.devpost.com/rules) were accessible during this review. Submit a newly built Twitch-connected project using Codex, an accessible GitHub/GitLab/Bitbucket repository with runnable source/assets/instructions, a functionality/Codex description, the principal Codex session ID and a YouTube demonstration. Keep the video below three minutes, showing Twitch functionality and Codex development. Provide English materials, authorized assets/integrations and free judging access. Confirm entrant eligibility. The four equally weighted criteria concern innovation, impact, technology and design.
 
-## Devpost English draft (claims must be updated after live verification)
+**Deadline discrepancy:** the header says November 2, 2026, 14:00 PST, equivalent to 18:00 Bolivia. Section 1 says 14:00 Pacific Time. The [official FAQ](https://twitchcon-codex.devpost.com/resources) instead lists 21:00 UTC, equivalent to 17:00 Bolivia. These statements conflict. Use **17:00 Bolivia on November 2 as the conservative cutoff**, finish substantially earlier and inspect Devpost's countdown. The original internal target remains November 1.
+
+The FAQ allows unlisted YouTube videos, but judges cannot view private videos. Private repositories must be on GitHub/GitLab and shared with the organizer contact specified in the rules; verify the actual address and access. A saved Devpost draft is not a submitted entry: confirm Submitted status. Do not alter submitted materials after the deadline without organizer permission.
+
+## Evidence and claim boundary
+
+| Capability | Current evidence | Accurate claim |
+|---|---|---|
+| Twitch OAuth and channel | Genuine authorization/provider validation completed; required permission and actual subscriptions inspected | Verified for one real channel |
+| Chat changes Aether 001 | User confirmed 1→2; backend traced the new message to persistence/WebSocket revision 52; Chromium displayed both accepted rows | Real one-channel chat demonstrated; evidence in output/live/ |
+| Client synchronization | Monotonic revisions and HTTP reconciliation; regression tests | Implemented and regression tested |
+| Two real channels and authentic raid | Not yet demonstrated in current evidence | Implemented; real end-to-end verification pending |
+| Approval, transfer persistence, portal | Local domain/fixture tests and labeled browser rehearsal | Locally tested; no authentic raid claim |
+| Native OBS | Chromium alpha checks only | OBS verification pending |
+| Automated checks | Final preparation: 66/66 tests, TypeScript/build passed; runtime audit zero known vulnerabilities | Local checks executed, not native OBS or live raid evidence |
+| Video/repository/Devpost | Preparation documents exist; final public links absent | Not published or submitted |
+
+The three original chat commands were not three accepted contributions: two arrived before an eligible open round and the third persisted. Rejected messages are not contributions. Do not infer participation from raid viewer counts. Preserve Aether 001 and its history; never reset the database for filming.
+
+## Devpost English description — current truthful version
 
 ### RAIDVERSE — carry what your community creates
 
-**Raids move viewers. RAIDVERSE carries a living creation.**
+**Raids move viewers. RAIDVERSE carries what they create.**
 
-We wanted the connection between two Twitch communities to last longer than a raid alert. RAIDVERSE lets chat forge a persistent energy artifact using four carefully constrained commands. A streamer closes a forging round, prepares its next destination, and raids another participating channel. A matching Twitch raid opens an invitation. The receiving streamer decides whether to accept, then a procedural portal materializes the same artifact in their overlay. Their community writes its next chapter without losing the original identity or history.
+### Inspiration
 
-The project is intentionally useful with a small chat. One person can make a visible contribution; there is no minimum viewer count. The elements work across gaming, music, art and conversation because the creation belongs to the community rather than a specific game.
+A raid briefly connects two communities. We wanted that connection to leave something people can continue creating together: a persistent energy artifact with its own identity and history.
 
-We built the frontend in React, TypeScript and Three.js and the backend in Node.js with SQLite and read-only WebSocket synchronization. The Twitch adapter implements server-side OAuth and EventSub subscriptions for chat and outgoing raids. The transfer protocol requires a registered receiver, a prepared destination, a matching raid and explicit acceptance. Cooldowns, contribution caps, opt-in moderator controls and an emergency overlay clear button keep the streamer in control.
+### What it does
 
-The public legacy page preserves the artifact's appearance, community lineage and contribution timeline. Synthetic rehearsal events are isolated from LIVE events and visibly labeled throughout the interface.
+Chat can evolve procedural 3D artwork through four predefined commands: `!forge light`, `!forge fire`, `!forge storm` and `!forge crystal`. The streamer controls each round. Accepted contributions change the deterministic state and appearance, and Memories records the creation's evolution.
 
-**Current validation disclosure:** the automated suite and browser rehearsal have been executed. The authentic two-channel Twitch/OBS flow has not yet been verified. This draft is not ready for submission until the live evidence below is completed.
+RAIDVERSE also implements a handoff protocol. The source prepares a registered, enabled receiver. A matching `channel.raid` event can open an invitation, and the receiver must explicitly accept. Our backend transfers the same artifact and preserves its history. Twitch's raid event does not transport the artifact or give us control of the receiver's OBS.
 
-### How Codex was used
+The experience works with small communities: an individual accepted contribution matters, without requiring a large audience or virtual economy.
 
-Codex created this new project from an empty workspace during the submission period. It implemented the domain model, SQLite transactions, secure control API, Twitch adapter, React dashboard, authored Three.js artifact/portal, automated tests and documentation. It ran build and test commands, used a real Chromium browser to exercise the synthetic flow, inspected captures, and corrected issues found during verification. The user supplies the product direction, authorizations, real channels, footage rights and final publication approval.
+### How we built it
 
-Main Codex session: **01a18894-cb84-7530-8113-1b14124a414e**.
+React, TypeScript and authored Three.js geometry/shaders render the experience. A Node.js backend owns participation rules, SQLite persistence, secure controls and read-only WebSocket synchronization. Twitch OAuth and EventSub provide authenticated identities, chat and raid notifications. The sole requested OAuth scope is `user:read:chat`.
 
-## 2:45 demonstration script / shot list
+Streamers retain control through opt-in reception, explicit approval, cooldowns and caps, constrained commands, authorized moderator controls and emergency hiding. Tokens remain encrypted on the local server. Clearly labeled REHEARSAL mode allows synthetic practice without presenting it as Twitch evidence.
 
-Capture the final video only after real integration passes. All spoken lines below describe intended final shots; they are not a claim those shots exist.
+### What we actually demonstrated
 
-| Time | Shot | Narration / proof |
-|---|---|---|
-| 0:00–0:20 | Actual receiver approval and OBS portal; clear source and destination labels. | “A Twitch raid moves viewers. What if it could also carry something they made together?” Show authentic event provenance; no synthetic footage as live proof. |
-| 0:20–0:55 | Source's real chat and overlay side by side; one command per element. | “Chat forges a living artifact. Four elements produce different visual changes. The streamer controls every round.” Show message identity and accepted count. |
-| 0:55–1:35 | End round, prepare receiver, real Twitch raid, receiver accepts, receiver chat evolves it. | “The destination chooses to accept. The artifact keeps the same identity, its earlier evolution and both communities.” Show before/after ID. |
-| 1:35–2:10 | Architecture diagram, test run, Codex session building/debugging a concrete feature. | “Codex helped build the state machine, Twitch connection, tests and procedural visual experience. Duplicate events cannot transfer the artifact twice.” Use only executed test output. |
-| 2:10–2:45 | Public legacy, clear/restore control, server restart preserving state, final artifact. | “The moment becomes a memory you can revisit. No arbitrary uploads or commands. The streamer stays in control. Made together. Carried forward.” |
+One genuine Twitch channel has authorized RAIDVERSE. Real chat changed Aether 001, with the user confirming its counter increased from 1 to 2 after a synchronization fix. Automated tests, TypeScript and production build passed at the latest recorded checkpoint. Browser rehearsal exercised the full transfer separately.
 
-## Live evidence still required
+**Current limitation:** an authentic two-channel raid, receiver approval/continued evolution and the portal inside native OBS Studio have not yet been verified. The project runs locally; remote communities require shared HTTPS hosting. Retain these limitations unless missing real checks are completed and recorded before submission.
 
-1. A and B authenticate in different browser profiles; capture each identity without secrets.
-2. Record successful real EventSub subscriptions and authentic chat changing the visible artifact.
-3. Perform the actual raid and save the event ID, timestamp and verified source/destination (exclude tokens).
-4. Receiver accepts, OBS portal plays, receiver chat evolves the SAME artifact ID.
-5. Restart the server and inspect the same legacy. Include clear/restore safety demonstration.
-6. Capture Codex implementation work and an executed test command for the video.
-7. Review recordings for secrets/rights, edit to under three minutes, get publication approval, upload to YouTube, and insert the actual URL.
+### How we used Codex
 
-## Known limitations for the final entry
+We directed Codex to build RAIDVERSE from an empty workspace during the hackathon. It implemented the domain model, Twitch adapter, persistence, control API, React interface, procedural artwork, tests and documentation. It ran checks, reviewed browser behavior and diagnosed a real LIVE synchronization issue: a late HTTP snapshot could replace newer WebSocket state. The fix uses monotonic revisions, with regression coverage for that ordering failure. The entrant supplied the concept, design direction, authorizations, real Twitch validation and final publication decisions.
 
-- Real Twitch OAuth/chat/raid and OBS end-to-end have not been verified yet.
-- Current installation is local; remote streamers and Internet-shareable legacy pages need a shared HTTPS deployment that has not been provisioned.
-- EventSub does not replay events lost during a disconnect.
-- Full-state SQLite writes/snapshots are appropriate for the local demonstration but have not been load-tested for large audiences.
-- Browser QA is Chromium-based; OBS, Firefox and Safari require separate checks.
-- Procedural audio, uploads, marketplace, payments, blockchain and generative services are outside the MVP.
-- No measured user adoption, impact metrics, awards or guarantees are claimed.
+Principal Codex session: **01a18894-cb84-7530-8113-1b14124a414e**.
+
+### What remains
+
+Complete the real receiver handoff and native OBS check, record the result without secrets and publish reproducible source plus a short demonstration. We claim no adoption metrics, large-scale load results or guaranteed score.
+
+## Before the cutoff
+
+If B is available, execute the independent-session receiver guide and [judge walkthrough](JUDGES.md). Record the genuine raid, invitation, acceptance, persistent ownership change and real contribution at B. Update claims only after checking those records.
+
+If B cannot be obtained, use [the truthful one-channel video plan](VIDEO-RECORDING.md). Lead with functioning authentic chat. Describe the transfer as implemented but not real-world verified. Rehearsal may explain the design only with a continuous synthetic label and spoken disclosure. Never call it a completed real raid. This fallback preserves a truthful Twitch-connected submission but weakens evidence for the central promise; it does not establish how judges will assess it. Do not lose recording time waiting indefinitely for B.
+
+## Final publication checklist
+
+- [ ] Review the latest security/test/build report and unresolved limitations.
+- [ ] Reproduce [JUDGES.md](JUDGES.md) from a clean install; include lockfile and `.env.example`, never real `.env`, `data/`, browser storage or private overlay links.
+- [ ] Obtain approval to publish the reviewed repository; test judge access at its actual GitHub/GitLab/Bitbucket URL.
+- [ ] Record actual Twitch functionality and Codex development; review rights/secrets; export below three minutes.
+- [ ] Obtain video approval, upload public or unlisted YouTube, verify playback outside the owner account.
+- [ ] Insert real repository/video URLs in Devpost; remove placeholders.
+- [ ] Include principal session ID, accurate English description, screenshots and testing instructions.
+- [ ] Confirm eligibility, ownership and teammate permissions.
+- [ ] Retain every unresolved limitation in the submitted text/video.
+- [ ] Obtain submission authorization, submit before the conservative cutoff and preserve Submitted confirmation.
+
+## Known limitations
+
+Authentic multi-channel raid/approval/receiver evolution and native OBS remain unverified until separately evidenced. Legacy URLs are local until deployment. EventSub does not replay events lost during disconnects. SQLite snapshots have not been load-tested for large audiences. Chromium viewport checks are not physical-device or OBS performance tests. No paid AI runtime, marketplace, uploads, payments, blockchain or generated-media service is included.

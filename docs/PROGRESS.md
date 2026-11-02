@@ -69,7 +69,42 @@ Before future large changes, inspect Git and propose a restore point. Initial sc
   - Verified no horizontal overflow across 1920, 1440, 1280, 820, and 390 px viewports.
   - Verified OBS overlay canvas transparency (zero alpha pixels outside artwork).
 
-## Next action / hard external gate
-The user must register a confidential Twitch application with callback http://localhost:3000/auth/callback and save credentials locally in raidverse/.env, never in chat or Git. Confirm two consenting real channels. Restart the server, authorize them in separate browser profiles, then execute docs/TESTING.md's LIVE checklist. Until that passes, **RAIDVERSE is not complete and not ready to submit**.
+## Current next action / hard external gate
+One real channel has authorized successfully and authentic chat works. Do not
+repeat application registration or replace its credentials. Follow
+[SECOND-CHANNEL.md](SECOND-CHANNEL.md) to authorize a consenting receiver in an
+independent browser profile on the same server, then perform the actual raid,
+approval, receiver contribution and native OBS checks. Until then the complete
+LIVE handoff is not verified. SUBMISSION.md includes a truthful one-channel
+fallback; the final video and publication remain open.
 
 No remote deployment, repository publication, YouTube upload or Devpost submission has been performed. Those need a concrete review and the user's publication approval. No paid AI API, promotional credits or new paid service was used.
+
+## Authentic LIVE checkpoint — November 1 Bolivia / November 2 UTC
+
+- Genuine token validation and enabled chat/raid subscriptions inspected; one real
+  channel authorized. No credential or application change was required.
+- Aether 001 retains two authentic light contributions. The new message arrived at
+  03:26:26 UTC, was accepted in round 3, persisted and broadcast at revision 52.
+  The user confirmed the visible 1→2 increase. Chromium confirmed two verified
+  history rows and the rendered relic, with no console errors/warnings.
+- Safe public evidence and screenshots are under output/live/. A consistent private
+  SQLite backup and original vault key are excluded from source delivery.
+- Restoration branch checkpoint/pre-final-delivery-c96b7c8 precedes this work.
+- Final suite **66/66 passed**: 28 domain, 10 API, 24 local Twitch fixtures, two
+  snapshot-ordering and two diagnostic-privacy tests. Added independent-session/logout
+  and completed-transfer/reopen regressions. Fixtures do not authenticate real users.
+- TypeScript + production build passed; existing ~773 kB bundle advisory remains.
+  Runtime npm audit returned zero known vulnerabilities at this check.
+- Source security review found no P0/P1 authorization/transfer blocker. It is not a
+  penetration test. Mode isolation, opt-in, approval, expiry and dedup remain enforced.
+- Updated English submission, judge guide, receiver guide, Codex session reference
+  and 2:40 recording plans. A silent real-legacy Chromium B-roll clip was recorded;
+  it does not depict a new chat arrival, raid or native OBS. Final video is not made.
+- Only one LIVE channel is registered. Authentic raid, B approval/evolution and OBS
+  remain pending operator availability. OBS was not found at standard install paths
+  or as running obs64; this does not prove it is absent everywhere.
+- Rules/FAQ disagree on UTC deadline. Use **17:00 Bolivia November 2** as a conservative
+  cutoff; see SUBMISSION.md. No external publication occurred.
+- No production data reset, design change, new feature, dependency install or paid
+  service. Production restart after the latest real message was not run this step.

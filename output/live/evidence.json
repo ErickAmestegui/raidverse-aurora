@@ -1,0 +1,212 @@
+{
+  "capturedAt": "2026-11-02T03:32:47.066Z",
+  "sourceCommit": "c96b7c8bffd2493ca138db5f46df9ec549d10795",
+  "kind": "AUTHENTIC_LIVE_READ_ONLY_OBSERVATION",
+  "origin": "http://localhost:3000",
+  "health": {
+    "ok": true,
+    "twitchConfigured": true,
+    "version": "0.1.0"
+  },
+  "revision": 52,
+  "channels": [
+    {
+      "id": "524332046",
+      "name": "erickamestegui",
+      "mode": "LIVE",
+      "enabled": true,
+      "incoming": false,
+      "artifactId": "f441363e-40ad-4d62-853a-4c345f6e344c"
+    }
+  ],
+  "connections": {
+    "524332046": {
+      "status": "Connected",
+      "chat": true,
+      "raid": true,
+      "lastEvent": 1793589986361
+    }
+  },
+  "artifacts": [
+    {
+      "id": "f441363e-40ad-4d62-853a-4c345f6e344c",
+      "name": "Aether 001",
+      "seed": 451324,
+      "mode": "LIVE",
+      "ownerId": "524332046",
+      "phase": "FORGING",
+      "round": 3,
+      "energy": {
+        "light": 2,
+        "fire": 0,
+        "storm": 0,
+        "crystal": 0
+      },
+      "history": [
+        {
+          "id": "caeb7e89-acf0-4336-9d83-1ea541b30e3e",
+          "at": 1793587658420,
+          "kind": "CREATED",
+          "channelId": "524332046",
+          "label": "Forged into existence at erickamestegui",
+          "evidence": "CONTROL"
+        },
+        {
+          "id": "14316c42-1c49-484d-8821-0f8a99199c1b",
+          "at": 1793587733658,
+          "kind": "FORGING",
+          "channelId": "524332046",
+          "label": "FORGING",
+          "evidence": "CONTROL"
+        },
+        {
+          "id": "07dc0f84-e893-4e68-98fe-6db6f7becabd",
+          "at": 1793587744859,
+          "kind": "CONTRIBUTION",
+          "channelId": "524332046",
+          "label": "erickamestegui forged light",
+          "evidence": "TWITCH",
+          "userId": "524332046",
+          "userName": "erickamestegui",
+          "element": "light",
+          "eventId": "a8db889f-4038-4a8d-b066-580a0d3ce609",
+          "round": 1
+        },
+        {
+          "id": "31d5bc72-6368-47db-9a89-c15d9b7c8745",
+          "at": 1793587840609,
+          "kind": "READY",
+          "channelId": "524332046",
+          "label": "READY",
+          "evidence": "CONTROL"
+        },
+        {
+          "id": "2a6128f6-9fbd-44e8-b87b-b36f9239e814",
+          "at": 1793587841834,
+          "kind": "FORGING",
+          "channelId": "524332046",
+          "label": "FORGING",
+          "evidence": "CONTROL"
+        },
+        {
+          "id": "d098f017-dccc-4e29-ba6f-5897dc205072",
+          "at": 1793587842851,
+          "kind": "READY",
+          "channelId": "524332046",
+          "label": "READY",
+          "evidence": "CONTROL"
+        },
+        {
+          "id": "8206217f-946a-4029-bc22-820d331e09d9",
+          "at": 1793587843681,
+          "kind": "FORGING",
+          "channelId": "524332046",
+          "label": "FORGING",
+          "evidence": "CONTROL"
+        },
+        {
+          "id": "e673ba13-3006-4ae8-a4ba-2b65b36097d9",
+          "at": 1793589985035,
+          "kind": "CONTRIBUTION",
+          "channelId": "524332046",
+          "label": "erickamestegui forged light",
+          "evidence": "TWITCH",
+          "userId": "524332046",
+          "userName": "erickamestegui",
+          "element": "light",
+          "eventId": "238a33fc-63d7-4b73-a07c-177368c1fde6",
+          "round": 3
+        }
+      ],
+      "communities": [
+        "524332046"
+      ],
+      "createdAt": 1793587658420,
+      "version": 9
+    }
+  ],
+  "transfers": [],
+  "checks": [
+    {
+      "artifactId": "f441363e-40ad-4d62-853a-4c345f6e344c",
+      "energyMatchesHistory": true,
+      "onlyAuthenticContributions": true,
+      "uniqueMessageIds": true
+    }
+  ],
+  "correlatedSafeTrace": [
+    {
+      "at": "2026-11-02T03:26:26.364Z",
+      "stage": "received",
+      "channelRef": "22a4792b6d26",
+      "eventRef": "0bcc6d54e683"
+    },
+    {
+      "at": "2026-11-02T03:26:26.372Z",
+      "stage": "validation",
+      "channelRef": "22a4792b6d26",
+      "eventRef": "0bcc6d54e683",
+      "actor": "broadcaster",
+      "mode": "LIVE",
+      "ageMs": 1337
+    },
+    {
+      "at": "2026-11-02T03:26:26.373Z",
+      "stage": "recognized",
+      "channelRef": "22a4792b6d26",
+      "eventRef": "0bcc6d54e683",
+      "actor": "broadcaster",
+      "mode": "LIVE",
+      "element": "light",
+      "ageMs": 1337
+    },
+    {
+      "at": "2026-11-02T03:26:26.379Z",
+      "stage": "persisted",
+      "channelRef": "22a4792b6d26",
+      "eventRef": "0bcc6d54e683",
+      "actor": "broadcaster",
+      "mode": "LIVE",
+      "element": "light",
+      "ageMs": 1337,
+      "round": 3,
+      "revision": 52,
+      "contributions": 2
+    },
+    {
+      "at": "2026-11-02T03:26:26.380Z",
+      "stage": "accepted",
+      "channelRef": "22a4792b6d26",
+      "eventRef": "0bcc6d54e683",
+      "actor": "broadcaster",
+      "mode": "LIVE",
+      "element": "light",
+      "ageMs": 1337,
+      "round": 3
+    },
+    {
+      "at": "2026-11-02T03:26:26.469Z",
+      "stage": "websocket",
+      "revision": 52,
+      "clients": 2
+    },
+    {
+      "at": "2026-11-02T03:31:17.538Z",
+      "stage": "websocket",
+      "revision": 52,
+      "clients": 2
+    },
+    {
+      "at": "2026-11-02T03:31:30.302Z",
+      "stage": "websocket",
+      "revision": 52,
+      "clients": 2
+    }
+  ],
+  "limits": [
+    "Public state and safe application traces are evidence of observed operation, not independently signed Twitch receipts.",
+    "Subscription confirmation does not establish a raid occurred.",
+    "No synthetic event was injected to generate this evidence.",
+    "Native OBS and two-channel transfer require separate verification."
+  ]
+}

@@ -25,6 +25,22 @@ describe('HTTP integration and security boundaries', () => {
     expect(await (await fetch(origin + '/api/health')).json()).toMatchObject({ ok: true, twitchConfigured: false });
     expect(await (await fetch(origin + '/api/me')).json()).toMatchObject({ mode: null, channelIds: [] });
   });
+  it('isolates two LIVE browser cookies and logs out only the chosen session', async () => {
+    for (const id of ['channel-a', 'channel-b']) app.domain.register(id, id, id, 'LIVE');
+    const a = store.createSession('channel-a'); const b = store.createSession('channel-b');
+    const cookieA = `rv_session=${a.token}`; const cookieB = `rv_session=${b.token}`;
+    const identity = async (cookie: string) => (await fetch(origin + '/api/me', { headers: { Cookie: cookie } })).json();
+    expect(await identity(cookieA)).toMatchObject({ channelIds: ['channel-a'], mode: 'LIVE' });
+    expect(await identity(cookieB)).toMatchObject({ channelIds: ['channel-b'], mode: 'LIVE' });
+    const settings = { type: 'settings', enabled: true, incoming: true, allowMods: false };
+    expect((await post('/api/control/channel-b', settings, cookieA, a.session.csrf)).status).toBe(400);
+    expect((await post('/api/control/channel-b', settings, cookieB, a.session.csrf)).status).toBe(400);
+    expect((await post('/api/control/channel-b', settings, cookieB, b.session.csrf)).status).toBe(200);
+    expect((await post('/api/logout', {}, cookieB, b.session.csrf)).status).toBe(200);
+    expect(await identity(cookieB)).toMatchObject({ channelIds: [], mode: null });
+    expect(await identity(cookieA)).toMatchObject({ channelIds: ['channel-a'], mode: 'LIVE' });
+    expect((await post('/api/control/channel-a', settings, cookieA, a.session.csrf)).status).toBe(200);
+  });
   it('rejects unauthorized control, cross-site POST and forged CSRF', async () => {
     expect((await post('/api/control/live', { type: 'clear' })).status).toBe(400);
     expect((await post('/api/rehearsal/start', {}, '', '', 'https://evil.example')).status).toBe(403);

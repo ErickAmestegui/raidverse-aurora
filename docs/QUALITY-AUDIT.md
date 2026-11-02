@@ -61,3 +61,18 @@ A protocol fixture is valuable for robustness but does not close the live-integr
 ## Phase 8 — Submission: OPEN
 
 English drafts, shot list, and architecture are prepared. A YouTube link, published repository, live footage, usage metrics, user testimonials and claims of production readiness must not be invented. Submission and publication require the operator's approval.
+
+## Final preparation — November 1 Bolivia / November 2 UTC
+
+Current internal assessments supersede earlier checkpoint scores, without changing
+their historical results. They are not official scores or predictions.
+
+| Criterion | Score | Existing evidence | Missing / risk | Highest-value action |
+|---|---:|---|---|---|
+| Innovation | 7 | Same-identity handoff model, lineage and receiver approval locally exercised; genuine chat creates persistent contributions. | Central cross-community promise lacks authentic handoff proof. No exhaustive novelty claim. | Record one ID before/after a real A→B raid. |
+| Potential impact | 6.5 | Real participation works without a minimum audience; independent onboarding and control documented. | No adoption, independent streamer study or remote hosting. | Onboard a second consenting streamer. |
+| Technology | 7.5 | Genuine one-channel OAuth/EventSub/chat, safe trace/history, synchronization fix, 66 tests, TypeScript/build and runtime audit passed. | Real raid, native OBS, real post-handoff persistence and load unverified. Audit is time-bound. | Execute authentic receiver/OBS checklist. |
+| Design | 8 | Aurora preserved; animated procedural relic and accepted history captured from real state at 1080p; prior five-viewport and alpha checks. | OBS performance, stream readability and unfamiliar-user feedback unmeasured. | Prepare B's source before approval; record in OBS. |
+
+No evidence-backed 10/10 is justified. If B is unavailable, retain the limitation
+and use the truthful one-channel video; never reclassify rehearsal as LIVE.

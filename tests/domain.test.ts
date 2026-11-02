@@ -92,6 +92,20 @@ describe('strict and deterministic forging', () => {
   });
 });
 describe('raid-gated transfer', () => {
+  it('retains a completed handoff and both communities contributions after reopening the database', () => {
+    create(); expect(chat({ messageId: 'source-contribution' })).toBe(true);
+    domain.action('a', { type: 'stop' }); domain.action('a', { type: 'prepare', target: 'b' });
+    expect(raid()).toBe(true); const transferId = store.read().transfers[0].id;
+    domain.action('b', { type: 'accept', transferId }); domain.action('b', { type: 'start' });
+    expect(chat({ channelId: 'b', userId: 'receiver-viewer', text: '!forge crystal', messageId: 'receiver-contribution' })).toBe(true);
+    const before = artifact(); const transfer = store.read().transfers[0];
+    store.close(); store = new Store(dir); domain = new Domain(store, () => {}, () => now);
+    expect(artifact()).toEqual(before); expect(store.read().transfers[0]).toEqual(transfer);
+    expect(artifact()).toMatchObject({ ownerId: 'b', communities: ['a', 'b'], energy: { light: 1, crystal: 1 } });
+    expect(artifact().history.filter(h => h.kind === 'CONTRIBUTION').map(h => h.eventId)).toEqual(['source-contribution', 'receiver-contribution']);
+    expect(raid()).toBe(false); expect(() => domain.action('b', { type: 'accept', transferId })).toThrow();
+    expect(artifact()).toEqual(before);
+  });
   it('preserves identity, energy, contributions and communities on acceptance', () => {
     create(); chat(); const before = artifact(); domain.action('a', { type: 'stop' }); domain.action('a', { type: 'prepare', target: 'b' });
     expect(raid()).toBe(true); const t = store.read().transfers[0]; expect(artifact().ownerId).toBe('a');

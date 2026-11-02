@@ -73,7 +73,13 @@ not proof of a new LIVE message.
   total contribution, one light contribution and its rendered canvas. This verifies
   the already-persisted LIVE state, not a new post-fix Twitch contribution.
 - Historical authentic light contribution: verified before changes.
-- New message after deployment: awaiting a message sent in actual Twitch chat.
-- Confirm a safe trace through accepted/persisted/broadcast, compare the public state
-  and displayed counter, then verify the same contribution after restart.
+- New message after deployment: **confirmed** at 03:26:26 UTC on November 2.
+  Safe correlated traces record received, validation, recognized, persisted (round 3,
+  revision 52, contributions 2), accepted and WebSocket broadcast. The user confirmed
+  the live counter changed from 1 to 2. Subsequent production Chromium inspection
+  displayed two contributions and two Twitch-verified history entries.
+- `output/live/evidence.json` preserves public state and the correlated safe trace.
+  A private consistent SQLite backup, including its original vault key, was created
+  outside the source delivery. No production restart was necessary in this final
+  preparation step; post-second-message restart persistence is not newly claimed.
 - No raid, second-channel handoff or OBS validation is claimed by this incident report.

@@ -28,10 +28,27 @@ The scripts in scripts/qa are a **checkpointed operator-assisted sequence**, not
 
 Executed browser assertions included: full rehearsal transfer and receiver evolution with the same artifact ID; explicit synthetic provenance; transparent overlay styles; emergency clear/restore; visible synthetic watermark; no horizontal overflow at 1280×720 and 390×844; 1920×1080 captures; public legacy. A brief requestAnimationFrame sample in Chromium measured 151 callbacks over 2.5 seconds (~60 callbacks/s). This is **not** a GPU rendering, performance-load or OBS benchmark.
 
-## Required manual LIVE checks — NOT RUN
+## LIVE checkpoint — one channel verified, remaining checks open
 
-- Authorize A and B independently. Verify exact Twitch user IDs and enabled chat/raid subscriptions.
-- Open a round, send actual chat and compare its message ID to the contribution record.
+On November 1 Bolivia / November 2 UTC, genuine OAuth and enabled provider
+subscriptions were inspected. Authentic chat produced two persisted contributions;
+the latest event was traced through commit and broadcast. The user confirmed the
+visible 1→2 increase. Production Chromium subsequently showed both accepted history
+entries and the current relic, with zero console errors/warnings. See
+[evidence](../output/live/README.md). This does not close the receiver/OBS gate.
+
+Latest executed suite: **66/66** (28 domain, 10 HTTP, 24 Twitch fixtures, two
+diagnostic-privacy and two snapshot-ordering tests). TypeScript + build passed.
+New checks establish isolated LIVE cookies/logout and a completed fixture transfer
+with both communities' contributions retained after reopening its temporary DB.
+No real account is authenticated by those fixtures.
+
+## Manual LIVE checks — record each result independently
+
+- A verified; authorize B independently using [SECOND-CHANNEL.md](SECOND-CHANNEL.md).
+  Verify both identities and genuine chat/raid subscriptions.
+- A's real light message and stored ID verified. Verify the other three powers
+  against authentic chat; their automated fixture checks already pass.
 - Verify the 10-second cooldown, closed round, pause and opted-in moderator controls.
 - Prepare A → B; make a real raid from A to B. Verify EventSub's source, destination, event ID and time.
 - Accept in B; inspect portal in the actual OBS Browser Source; verify contributions and history persist.

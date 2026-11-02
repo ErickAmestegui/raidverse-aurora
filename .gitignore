@@ -10,3 +10,5 @@ data-*/
 coverage/
 test-results/
 .playwright-cli/
+.local-backups/
+.local-logs/
