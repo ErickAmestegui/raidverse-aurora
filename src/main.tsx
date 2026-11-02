@@ -5,6 +5,7 @@ import type { Artifact, Channel, Element, Me, Snapshot } from './shared';
 import './aurora.css';
 import { Dashboard, AuroraLogo } from './Dashboard';
 import { request } from './network';
+import { latestSnapshot } from './snapshot-sync';
 
 const EMPTY: Snapshot = { revision: 0, channels: [], artifacts: [], transfers: [] };
 const emptyMe: Me = { channelIds: [], mode: null, csrf: '', twitchConfigured: false, connections: {} };
@@ -15,15 +16,25 @@ function useConnection() {
   const refreshMe = async () => { const m = await request<Me>('/api/me'); setMe(m); return m; };
   useEffect(() => {
     let closed = false; let socket: WebSocket; let timer: ReturnType<typeof setTimeout>; let attempts = 0;
+    let snapshotPending = false;
+    const acceptSnapshot = (incoming: Snapshot) => { if (!closed) setSnapshot(current => latestSnapshot(current, incoming)); };
+    const refreshSnapshot = async () => {
+      if (snapshotPending || closed) return;
+      snapshotPending = true;
+      try { acceptSnapshot(await request<Snapshot>('/api/snapshot')); }
+      finally { snapshotPending = false; }
+    };
     const connect = () => {
       socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/socket`);
       socket.onopen = () => { attempts = 0; setOnline(true); setNetworkError(''); };
-      socket.onmessage = e => { try { const msg = JSON.parse(e.data); if (msg.type === 'snapshot') setSnapshot(msg.data); } catch { setNetworkError('State update could not be read. Reconnecting…'); socket.close(); } };
+      socket.onmessage = e => { try { const msg = JSON.parse(e.data); if (msg.type === 'snapshot') acceptSnapshot(msg.data); } catch { setNetworkError('State update could not be read. Reconnecting…'); socket.close(); } };
       socket.onclose = () => { setOnline(false); if (!closed) timer = setTimeout(connect, Math.min(15000, 1000 * 2 ** attempts++)); };
       socket.onerror = () => socket.close();
     };
-    request<Snapshot>('/api/snapshot').then(setSnapshot).catch(() => setNetworkError('Cannot reach RAIDVERSE. Check the local server.'));
-    refreshMe().catch(() => {}); connect(); const poll = setInterval(() => refreshMe().catch(() => {}), 10000);
+    refreshSnapshot().catch(() => setNetworkError('Cannot reach RAIDVERSE. Check the local server.'));
+    refreshMe().catch(() => {}); connect();
+    // Reconcile authoritative state even if a socket remains open but an update is missed.
+    const poll = setInterval(() => { void refreshMe().catch(() => {}); void refreshSnapshot().catch(() => {}); }, 10000);
     return () => { closed = true; clearTimeout(timer); clearInterval(poll); socket?.close(); };
   }, []);
   return { snapshot, online, me, refreshMe, networkError };

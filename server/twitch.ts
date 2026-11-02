@@ -2,6 +2,7 @@ import WebSocket from 'ws';
 import { z } from 'zod';
 import { Domain } from './domain.js';
 import type { Credentials, Store } from './store.js';
+import { traceChat } from './chat-diagnostics.js';
 
 const tokenSchema = z.object({ access_token: z.string(), refresh_token: z.string(), expires_in: z.number().positive() });
 const validationSchema = z.object({ client_id: z.string(), user_id: z.string(), login: z.string(), scopes: z.array(z.string()), expires_in: z.number() });
@@ -178,10 +179,11 @@ class EventConnection {
   }
   private async handle(ws: WebSocket, raw: string, migration: boolean) {
     if (this.stopped) return;
-    const parsed = envelope.safeParse(JSON.parse(raw)); if (!parsed.success) return;
+    const parsed = envelope.safeParse(JSON.parse(raw)); if (!parsed.success) { traceChat('rejected', { reason: 'invalid_envelope', channelId: this.user }); return; }
     const { metadata, payload } = parsed.data; this.last = Date.now();
     if (metadata.message_type === 'session_welcome') {
       const session = z.object({ id: z.string(), keepalive_timeout_seconds: z.number().nullable() }).parse(payload.session);
+      traceChat('session', { channelId: this.user, sessionId: session.id });
       const previous = this.socket; this.socket = ws; this.keepalive = (session.keepalive_timeout_seconds ?? 30) * 1000;
       if (previous && previous !== ws) previous.close();
       if (!migration) {
@@ -197,6 +199,7 @@ class EventConnection {
           if (this.stopped || this.socket !== ws || ws.readyState !== WebSocket.OPEN) return;
           if (result.data[0].status !== 'enabled') throw new Error('Subscription not enabled');
           this.subscriptions.set(result.data[0].id, type);
+          traceChat('subscription', { channelId: this.user, sessionId: session.id, chat: type === 'channel.chat.message', raid: type === 'channel.raid', broadcasterMatches: true, readerMatches: type === 'channel.chat.message' });
           if (type === 'channel.raid') this.info.raid = true; else this.info.chat = true;
         }
       }
@@ -208,12 +211,15 @@ class EventConnection {
       this.twitch.invalidate(this.user);
     } else if (metadata.message_type === 'notification') {
       const sub = z.object({ id: z.string(), type: z.string(), condition: z.record(z.string(), z.unknown()) }).parse(payload.subscription);
-      if (this.subscriptions.get(sub.id) !== sub.type) return;
-      const at = Date.parse(metadata.message_timestamp); if (!Number.isFinite(at)) return;
+      if (this.subscriptions.get(sub.id) !== sub.type) { traceChat('rejected', { channelId: this.user, eventId: metadata.message_id, reason: 'unknown_subscription' }); return; }
+      const at = Date.parse(metadata.message_timestamp); if (!Number.isFinite(at)) { traceChat('rejected', { channelId: this.user, eventId: metadata.message_id, reason: 'invalid_timestamp' }); return; }
       this.info.lastEvent = Date.now();
       if (sub.type === 'channel.chat.message') {
-        const e = chatSchema.parse(payload.event);
-        if (e.broadcaster_user_id !== this.user || sub.condition.broadcaster_user_id !== this.user) return;
+        const result = chatSchema.safeParse(payload.event);
+        if (!result.success) { traceChat('rejected', { channelId: this.user, eventId: metadata.message_id, reason: 'invalid_schema' }); return; }
+        const e = result.data;
+        traceChat('received', { channelId: this.user, eventId: e.message_id });
+        if (e.broadcaster_user_id !== this.user || sub.condition.broadcaster_user_id !== this.user || sub.condition.user_id !== this.user) { traceChat('rejected', { channelId: this.user, eventId: e.message_id, reason: 'wrong_channel' }); return; }
         this.twitch.domain.chat({ channelId: this.user, userId: e.chatter_user_id, userName: e.chatter_user_name,
           text: e.message.text, messageId: e.message_id, at, mode: 'LIVE', moderator: e.badges.some(b => b.set_id === 'moderator'), shared: Boolean(e.source_broadcaster_user_id && e.source_broadcaster_user_id !== this.user) });
       } else if (sub.type === 'channel.raid') {

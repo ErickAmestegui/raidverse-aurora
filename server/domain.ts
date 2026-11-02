@@ -2,6 +2,7 @@ import { randomInt, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { Artifact, Channel, Element, History, Mode, Phase } from '../src/shared.js';
 import { activeTransfer, current, secret, Store, type State } from './store.js';
+import { traceChat, type ChatTrace } from './chat-diagnostics.js';
 
 const artifactName = z.string().trim().min(1).max(48).refine(name => !/[\u0000-\u001f\u007f]/.test(name), 'Use a single-line artifact name');
 export const actionSchema = z.discriminatedUnion('type', [
@@ -136,34 +137,51 @@ export class Domain {
     }); this.changed();
   }
   chat(input: { channelId: string; userId: string; userName: string; text: string; messageId: string; at: number; mode: Mode; moderator: boolean; shared: boolean }) {
-    if (input.shared || Math.abs(this.clock() - input.at) > 120_000) return false;
+    const facts: ChatTrace = { channelId: input.channelId, eventId: input.messageId, mode: input.mode, actor: input.userId === input.channelId ? 'broadcaster' : 'viewer', ageMs: this.clock() - input.at };
+    const reject = (reason: ChatTrace['reason']) => { traceChat('rejected', { ...facts, reason }); return false; };
+    traceChat('validation', facts);
+    if (input.shared) return reject('shared_chat');
+    if (!Number.isFinite(input.at)) return reject('invalid_timestamp');
+    if (Math.abs(this.clock() - input.at) > 120_000) return reject('stale_event');
     const element = parseForge(input.text);
     const control = /^!rv (pause|resume|clear)$/i.exec(input.text.trim());
-    if (!element && !control) return false;
+    if (!element && !control) return reject('not_a_command');
+    if (element) facts.element = element;
+    traceChat('recognized', facts);
     const result = this.store.transaction(s => {
       const c = s.channels.find(c => c.id === input.channelId && c.mode === input.mode);
-      if (!c) return false;
+      if (!c) return reject('unknown_channel_or_mode');
       if (control) {
-        if (input.userId !== c.id && !(c.allowMods && input.moderator)) return false;
+        if (input.userId !== c.id && !(c.allowMods && input.moderator)) return reject('unauthorized_control');
         const cmd = control[1].toLowerCase();
         if (cmd === 'clear') c.hidden = true;
         else if (cmd === 'pause') c.enabled = false;
         else c.enabled = true;
         return true;
       }
-      if (!c.enabled || !c.artifactId) return false;
+      if (!c.enabled) return reject('disabled');
+      if (!c.artifactId) return reject('no_artifact');
       const a = current(s, c);
-      if (!['FORGING', 'EVOLVING'].includes(a.phase) || a.history.length >= 20_000) return false;
+      facts.round = a.round;
+      if (!['FORGING', 'EVOLVING'].includes(a.phase)) return reject('round_closed');
+      if (a.history.length >= 20_000) return reject('history_limit');
       const all = a.history.filter(h => h.kind === 'CONTRIBUTION');
       const user = all.filter(h => h.userId === input.userId && h.channelId === c.id);
-      if (user.filter(h => h.round === a.round).length >= 3 || user.some(h => input.at - h.at < 10_000)) return false;
-      if (all.filter(h => h.at > input.at - 1000).length >= 20) return false;
+      if (user.filter(h => h.round === a.round).length >= 3) return reject('round_user_limit');
+      if (user.some(h => input.at - h.at < 10_000)) return reject('cooldown');
+      if (all.filter(h => h.at > input.at - 1000).length >= 20) return reject('channel_rate_limit');
       a.energy[element!]++;
       record(a, input.at, 'CONTRIBUTION', c.id, `${input.userName} forged ${element}`, c.mode === 'LIVE' ? 'TWITCH' : 'SYNTHETIC',
         { userId: input.userId, userName: input.userName.slice(0, 64), element: element!, eventId: input.messageId, round: a.round });
       return true;
     }, `${input.mode}:chat:${input.messageId}`);
-    if (result) this.changed(); return Boolean(result);
+    if (result === null) return reject('duplicate');
+    if (result) {
+      const state = this.store.read(); const channel = state.channels.find(c => c.id === input.channelId); const a = state.artifacts.find(a => a.id === channel?.artifactId);
+      traceChat('persisted', { ...facts, revision: state.revision, contributions: a ? Object.values(a.energy).reduce((n, v) => n + v, 0) : undefined });
+      this.changed(); traceChat('accepted', facts);
+    }
+    return Boolean(result);
   }
   raid(input: { from: string; to: string; eventId: string; viewers: number; at: number; mode: Mode }) {
     this.expire();

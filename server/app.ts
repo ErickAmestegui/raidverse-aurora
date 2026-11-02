@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { actionSchema, Domain } from './domain.js';
 import { Store, type Session } from './store.js';
 import { Twitch, type TwitchConfig } from './twitch.js';
+import { traceChat } from './chat-diagnostics.js';
 
 export interface AppConfig extends TwitchConfig { secureCookies: boolean; rehearsal: boolean }
 const safeEqual = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
@@ -20,8 +21,9 @@ export function createApp(store: Store, config: AppConfig) {
   const broadcast = () => {
     if (broadcastTimer) return;
     broadcastTimer = setTimeout(() => {
-      broadcastTimer = null; const text = JSON.stringify({ type: 'snapshot', data: store.public() });
+      broadcastTimer = null; const snapshot = store.public(); const text = JSON.stringify({ type: 'snapshot', data: snapshot });
       for (const ws of clients) if (ws.readyState === WebSocket.OPEN) { if (ws.bufferedAmount > 2_000_000) ws.terminate(); else ws.send(text); }
+      traceChat('websocket', { revision: snapshot.revision, clients: [...clients].filter(ws => ws.readyState === WebSocket.OPEN).length });
     }, 80);
   };
   const domain = new Domain(store, broadcast); const twitch = new Twitch(store, domain, config, broadcast);

@@ -29,6 +29,42 @@ describe('strict and deterministic forging', () => {
     const e = { light: 4, fire: 3, storm: 2, crystal: 5 }; expect(appearance(e)).toEqual(appearance({ crystal: 5, storm: 2, fire: 3, light: 4 }));
     create(); expect(chat()).toBe(true); expect(artifact().energy.light).toBe(1); expect(artifact().history.at(-1)).toMatchObject({ evidence: 'TWITCH', userId: 'viewer', eventId: 'm-0', round: 1 });
   });
+  it('accepts the broadcaster and unregistered viewers through the same LIVE rules', () => {
+    create();
+    expect(chat({ userId: 'a', userName: 'Broadcaster', messageId: 'broadcaster-message' })).toBe(true);
+    expect(chat({ userId: 'unregistered-viewer', messageId: 'viewer-message', text: '!forge fire' })).toBe(true);
+    expect(store.read().channels.some(c => c.id === 'unregistered-viewer')).toBe(false);
+    expect(artifact().energy).toEqual({ light: 1, fire: 1, storm: 0, crystal: 0 });
+    expect(artifact().history.filter(h => h.kind === 'CONTRIBUTION').map(h => h.eventId)).toEqual(['broadcaster-message', 'viewer-message']);
+  });
+  it('credits only the command sent after artifact creation and round opening', () => {
+    expect(chat({ userId: 'a', messageId: 'before-artifact' })).toBe(false);
+    domain.action('a', { type: 'create', name: 'Aether' });
+    expect(chat({ userId: 'a', messageId: 'before-round' })).toBe(false);
+    domain.action('a', { type: 'start' });
+    expect(chat({ userId: 'a', messageId: 'during-round' })).toBe(true);
+    expect(artifact().energy.light).toBe(1);
+    expect(artifact().history.filter(h => h.kind === 'CONTRIBUTION').map(h => h.eventId)).toEqual(['during-round']);
+  });
+  it('does not replay broadcaster or viewer commands rejected during a closed round', () => {
+    create(); domain.action('a', { type: 'stop' });
+    for (const userId of ['a', 'new-viewer']) expect(chat({ userId, messageId: `closed-${userId}` })).toBe(false);
+    domain.action('a', { type: 'start' }); now += 11_000;
+    for (const userId of ['a', 'new-viewer']) expect(chat({ userId, messageId: `closed-${userId}` })).toBe(false);
+    expect(chat({ userId: 'a', messageId: 'fresh-owner' })).toBe(true);
+    expect(chat({ userId: 'new-viewer', messageId: 'fresh-viewer' })).toBe(true);
+    expect(artifact().energy.light).toBe(2);
+  });
+  it('preserves cooldown, deduplication and round limits for the broadcaster', () => {
+    create(); expect(chat({ userId: 'a', messageId: 'owner-first' })).toBe(true);
+    expect(chat({ userId: 'a', messageId: 'owner-second' })).toBe(false);
+    expect(chat({ userId: 'a', messageId: 'owner-third' })).toBe(false);
+    expect(artifact().energy.light).toBe(1);
+    now += 10_000; expect(chat({ userId: 'a', messageId: 'owner-first' })).toBe(false);
+    expect(chat({ userId: 'a' })).toBe(true); now += 10_000; expect(chat({ userId: 'a' })).toBe(true);
+    now += 10_000; expect(chat({ userId: 'a' })).toBe(false);
+    expect(artifact().energy.light).toBe(3);
+  });
   it('enforces cooldown and per-round contribution limits', () => {
     create(); expect(chat()).toBe(true); expect(chat()).toBe(false);
     now += 10_000; expect(chat()).toBe(true); now += 10_000; expect(chat()).toBe(true); now += 10_000; expect(chat()).toBe(false);

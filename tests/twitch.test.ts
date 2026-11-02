@@ -56,6 +56,31 @@ describe('Twitch adapter with local protocol fixtures — NOT live Twitch eviden
     await connect(); send(message()); send(message()); await waitFor(() => store.read().artifacts[0].energy.crystal === 1);
     expect(store.read().artifacts[0].history.filter(h => h.kind === 'CONTRIBUTION')).toHaveLength(1);
   });
+  it('maps real-shaped broadcaster and spectator messages without requiring viewer registration', async () => {
+    await connect();
+    send(message({ chatter_user_id: id, chatter_user_name: 'Broadcaster', message: { text: '!forge light', fragments: [{ type: 'text', text: '!forge light' }] }, badges: [{ set_id: 'broadcaster', id: '1', info: '' }], source_broadcaster_user_id: null }, 'owner-chat-id'));
+    send(message({ chatter_user_id: 'new-spectator', message: { text: '!forge fire' }, source_broadcaster_user_id: null }, 'spectator-chat-id'));
+    await waitFor(() => store.read().artifacts[0].energy.light === 1 && store.read().artifacts[0].energy.fire === 1);
+    expect(store.read().channels).toHaveLength(1);
+    expect(store.read().artifacts[0].history.filter(h => h.kind === 'CONTRIBUTION')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ userId: id, eventId: 'owner-chat-id', evidence: 'TWITCH', element: 'light' }),
+      expect.objectContaining({ userId: 'new-spectator', eventId: 'spectator-chat-id', evidence: 'TWITCH', element: 'fire' }),
+    ]));
+  });
+  it('does not credit duplicate broadcaster messages or replay messages from a closed round', async () => {
+    await connect(); domain.action(id, { type: 'stop' });
+    const closed = message({ chatter_user_id: id }, 'closed-owner-message'); send(closed);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    domain.action(id, { type: 'start' }); send(closed);
+    const fresh = message({ chatter_user_id: id }, 'open-owner-message'); send(fresh); send(fresh);
+    await waitFor(() => store.read().artifacts[0].energy.crystal === 1);
+    expect(store.read().artifacts[0].history.filter(h => h.kind === 'CONTRIBUTION')).toHaveLength(1);
+  });
+  it('rejects a notification whose chat reader condition does not match the authenticated user', async () => {
+    await connect(); const forged = message({}, 'wrong-reader'); forged.payload.subscription.condition.user_id = 'other'; send(forged);
+    send(message({}, 'valid-reader')); await waitFor(() => store.read().artifacts[0].energy.crystal === 1);
+    expect(store.read().artifacts[0].history.filter(h => h.kind === 'CONTRIBUTION').map(h => h.eventId)).toEqual(['valid-reader']);
+  });
   it('persists all four allowlisted powers from independently identified chatters', async () => {
     await connect();
     for (const element of ['light', 'fire', 'storm', 'crystal']) {
