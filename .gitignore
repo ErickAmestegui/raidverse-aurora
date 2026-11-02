@@ -12,3 +12,19 @@ test-results/
 .playwright-cli/
 .local-backups/
 .local-logs/
+# Never publish local credentials, databases, backups or browser authentication.
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.key
+*.pem
+*.p12
+*.pfx
+*.bak
+*.backup
+*.zip
+.playwright-mcp/
+playwright/.auth/
+storage-state*.json
+storageState*.json
